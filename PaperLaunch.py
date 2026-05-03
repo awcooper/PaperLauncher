@@ -6,6 +6,8 @@
 ##A 15-112 term project by Adam Cooper   ##
 ###########################################
 import pygame, os, pickle, random, math, time
+
+SAVE_FILE = 'PaperLaunchFiles/PLSaveFile.pkl'
 pygame.init()
 pygame.font.init()
 
@@ -45,18 +47,18 @@ def empty():
 
 def loadGame():
     try:
-        data.save = pickle.load(open('PaperLaunchFiles/PLSaveFile.pkl','rb'))
+        data.save = pickle.load(open(SAVE_FILE, 'rb'))
         data.firstTime = False
-    except:
-        saveFile = data.emptySaveFile 
+    except (FileNotFoundError, IOError, EOFError, pickle.UnpicklingError):
+        saveFile = data.emptySaveFile
         data.firstTime = 'saveMessage'
         try:
-            pickle.dump(saveFile ,open('PaperLaunchFiles/PLSaveFile.pkl','wb'))
-            data.save =  pickle.load(open('PaperLaunchFiles/PLSaveFile.pkl','rb'))
+            pickle.dump(saveFile, open(SAVE_FILE, 'wb'))
+            data.save = pickle.load(open(SAVE_FILE, 'rb'))
             data.createdSaveFile = True
-        except:
+        except (IOError, OSError):
             data.createdSaveFile = False
-            data.save = data.emptySaveFile 
+            data.save = data.emptySaveFile
 
 empty()
 loadGame()
@@ -199,7 +201,7 @@ def initImages():
     data.htpImages = []
     data.sprites = dict()
     imageFinder('PaperLaunchFiles/Images')
-    for htpnumber in xrange(1,9):
+    for htpnumber in range(1,9):
         data.htpImages += [data.sprites['htp' + str(htpnumber)]]
     data.selfFallingSprite = [data.sprites['selfFalling'],
                               data.sprites['selfFalling2'],
@@ -330,7 +332,7 @@ def monsterFactory():
 def gameOver():
     if data.autoSave:
         save()
-    data.bank += data.distance/100
+    data.bank += data.distance//100
     data.endTime = time.time()
     
 
@@ -481,7 +483,7 @@ class shark(physicalObject):
         self.width, self.height = self.image.get_size()
         self.location = [ (data.canvasWidth + self.width ), random.randint(
             data.canvasHeight - data.bgHeight + self.height + data.bgy,
-            data.canvasHeight - data.bgHeight/2 + self.height + data.bgy ) ]
+            data.canvasHeight - data.bgHeight//2 + self.height + data.bgy ) ]
     def event(self):
         if self.encounter == False:
             self.encounter = True
@@ -537,7 +539,7 @@ class nyanCat(physicalObject):
         self.width, self.height = self.image.get_size()
         self.location = [ (data.canvasWidth + self.width ),
             random.randint( data.canvasHeight - data.bgHeight + self.height + data.bgy,
-                           data.canvasHeight - data.bgHeight/2 + self.height + data.bgy ) ]
+                           data.canvasHeight - data.bgHeight//2 + self.height + data.bgy ) ]
     def draw(self):
         pad = .2
         # for more explanations look at car
@@ -546,12 +548,12 @@ class nyanCat(physicalObject):
                                   int(self.location[1] + self.height*pad),
                                   int(self.width *( 1 - pad*2)),
                                   int(self.height *( 1 - pad*2))) 
-        if (self.animationCounter/3) % 4 == 0:
+        if (self.animationCounter//3) % 4 == 0:
             self.image = data.sprites['nyanCat']
-        if (self.animationCounter/3) % 4 == 1:
+        if (self.animationCounter//3) % 4 == 1:
             self.image = data.sprites['nyanCat1']
-        if (self.animationCounter/3) % 4 == 2:
-            self.image = data.sprites['nyanCat2']           
+        if (self.animationCounter//3) % 4 == 2:
+            self.image = data.sprites['nyanCat2']
         else: self.image = data.sprites['nyanCat3']
         data.screen.blit(self.image,self.location)
         if data.debugMode == True:
@@ -591,9 +593,9 @@ class airplane(physicalObject):
         self.width, self.height = self.image.get_size()
         self.location = [ (data.canvasWidth + self.width ),
             random.randint( data.canvasHeight - data.bgHeight + self.height + data.bgy,
-                           data.canvasHeight - data.bgHeight/2 + self.height + data.bgy ) ]
+                           data.canvasHeight - data.bgHeight//2 + self.height + data.bgy ) ]
     def draw(self):
-        # look at car for more Explanation 
+        # look at car for more Explanation
         pad = .2
         self.animationCounter = not(self.animationCounter)
         self.hitbox = pygame.Rect(int(self.location[0] + self.width*pad),
@@ -718,12 +720,12 @@ def drawSketchBook():
     data.sketchbookDisplay = makeSketchbook() 
     width, height = data.sketchbookDisplay[data.sketchbookSelect][0].get_size()
     data.screen.blit(data.sketchbookDisplay[data.sketchbookSelect][0],
-                     (data.canvasWidth/2 - width/2, data.canvasHeight/2 - height/2))
+                     (data.canvasWidth//2 - width//2, data.canvasHeight//2 - height//2))
     font = pygame.font.Font(data.ariel, 40)
     name = font.render( data.sketchbookDisplay[data.sketchbookSelect][1] , 1, (10, 12, 10))
     width, height = name.get_size()
-    data.screen.blit(name,[data.canvasWidth/2 - width/2,
-                           data.canvasHeight - 50 - height/2])
+    data.screen.blit(name,[data.canvasWidth//2 - width//2,
+                           data.canvasHeight - 50 - height//2])
     
 def drawInstructions():
     data.screen.blit(data.sprites['htpBg'],(0,0))
@@ -765,7 +767,7 @@ def drawGameOver():
     font = pygame.font.Font(data.ariel, 20)
     bank = text = font.render(str(data.bank), 1, (10, 12, 10))
     runCash = font.render(str(data.runCash), 1, (10, 12, 10))
-    distance = font.render(str(data.distance/100), 1, (10, 12, 10))
+    distance = font.render(str(data.distance//100), 1, (10, 12, 10))
     runTime = data.endTime - data.startTime 
     runTime = ('%.1fs') % (runTime)
     runTime = font.render(runTime, 1, (10, 12, 10))
@@ -780,7 +782,7 @@ def drawGameOver():
 
 
 def drawMainMenu():
-    middle = data.canvasWidth/2 - data.buttonWidth/2
+    middle = data.canvasWidth//2 - data.buttonWidth//2
     data.screen.blit(data.menubg,(0,0))
     buffer = 60
     down = 120
@@ -790,10 +792,10 @@ def drawMainMenu():
         if button == 1:
             image = pygame.transform.scale(image, (int(data.buttonWidth*scale),
                     int(data.buttonHeight*scale) +down))
-            position = (data.canvasWidth/2 - int(data.buttonWidth*scale)/2 ,
-                    data.canvasHeight/2 - int(data.buttonHeight*scale) +down)
+            position = (data.canvasWidth//2 - int(data.buttonWidth*scale)//2 ,
+                    data.canvasHeight//2 - int(data.buttonHeight*scale) +down)
         else: position = (middle - data.buttonWidth - buffer,
-                    data.canvasHeight/2 - data.buttonHeight + down)
+                    data.canvasHeight//2 - data.buttonHeight + down)
         data.screen.blit(image,position)
         middle += data.buttonWidth + buffer
 
@@ -808,9 +810,9 @@ def drawInfo():
         pygame.draw.rect( data.screen,[0,0,0],[ 70, 4, 100, 35], 2)
         height = font.render(str(data.selfHeight) + 'm',  1, (10, 12, 10))
         data.screen.blit(height, [72,6])
-    text = font.render("Distance: " + str(data.distance/100) + 'm', 1, (10, 12, 10))
-    textpos = text.get_rect(centerx=data.canvasWidth/2, centery=data.canvasHeight - 20)
-    data.screen.blit(text, [data.canvasWidth/2 - 80, data.canvasHeight - 30 ] )
+    text = font.render("Distance: " + str(data.distance//100) + 'm', 1, (10, 12, 10))
+    textpos = text.get_rect(centerx=data.canvasWidth//2, centery=data.canvasHeight - 20)
+    data.screen.blit(text, [data.canvasWidth//2 - 80, data.canvasHeight - 30 ] )
     pygame.draw.rect( data.screen,[0,0,0],[4, data.canvasHeight - 36, data.canvasWidth-6, 30],2)
 
 def drawStore():
@@ -827,7 +829,7 @@ def drawBootStore():
     start = 323
     pos = 0
     tall = 170  + iconHeight + 15
-    for boot in xrange(len(data.bootSprites)):
+    for boot in range(len(data.bootSprites)):
         bootIcon = pygame.transform.scale(data.bootSprites[boot],(iconWidth,iconHeight))
         if data.unlockedBoots <= boot:
             bootIcon = bootIcon.convert()
@@ -850,7 +852,7 @@ def drawCannonStore():
     iconHeight = 80
     iconWidth = 100
     data.allCannons
-    for cannon in xrange(len(data.cannonSprites)):
+    for cannon in range(len(data.cannonSprites)):
         cannonIcon = pygame.transform.scale(data.cannonSprites[cannon],(iconWidth,iconHeight))
         if data.unlockedCannons <= cannon:
             cannonIcon = cannonIcon.convert()
@@ -869,7 +871,7 @@ def drawCannonStore():
 
         
 def drawLevelBars():
-    for bar in xrange(0,5):
+    for bar in range(0,5):
         barWidth = data.stats[bar]
         barHeight = 40
         pygame.draw.rect( data.screen,[255,0,0],
@@ -938,12 +940,12 @@ def drawPurchaseInfo():
 def drawBoosts():
     start = 6
     width = 25
-    for boost in xrange(data.maxBoost ):
+    for boost in range(data.maxBoost ):
         pygame.draw.rect( data.screen,[0,0,0],[start,data.canvasHeight - 34, width-2,28])
         start += width
     start = 6
     width = 25
-    for boost in xrange(data.boostCount):
+    for boost in range(data.boostCount):
         pygame.draw.rect( data.screen,[0,0,0xff],
             [start,data.canvasHeight - 34, width-2, 28])
         start += width
@@ -976,7 +978,7 @@ def scrollBackground():
         data.bgy = 0
     if data.bgx > data.bgWidth:
         data.bgx = 0 
-    for tile in xrange(0, abs( -1*data.canvasWidth/data.bgWidth)+1):
+    for tile in range(0, abs( -1*data.canvasWidth//data.bgWidth)+1):
         data.screen.blit(data.bg,
             (tile*data.bgWidth - data.bgx,
              data.canvasHeight - data.bgHeight + data.bgy))
@@ -986,9 +988,9 @@ def scrollBackground():
 ################## Controler Functions ###################################
 ##########################################################################
 
-def keyPressed():
+def keyPressed(event):
     if event.type == pygame.MOUSEBUTTONDOWN:
-        print pygame.mouse.get_pos()
+        print(pygame.mouse.get_pos())
     if event.type == pygame.KEYDOWN and data.keyDown == False:
         if data.firstTime == 'saveMessage':
             data.firstTime = True
@@ -1002,22 +1004,22 @@ def keyPressed():
             else:
                 data.htpi += 1
         elif event.key == pygame.K_i:
-            data.instructions = True 
+            data.instructions = True
         elif data.currentScreen == 'game':
-            gameControl()
+            gameControl(event)
         elif data.currentScreen == 'mainMenu':
-            mainMenuControl()
+            mainMenuControl(event)
         elif data.currentScreen == 'store':
-            storeControl()
+            storeControl(event)
         elif data.currentScreen == 'extras':
-            extrasControl()
+            extrasControl(event)
         elif data.currentScreen == 'options':
-            optionsControl()
+            optionsControl(event)
         data.keyDown = True
     if event.type == pygame.KEYUP:
         data.keyDown = False
 
-def optionsControl():
+def optionsControl(event):
     if event.key == pygame.K_RETURN:
         if data.optionsSelect == 'autoSave':
             data.autoSave = not(data.autoSave)
@@ -1046,7 +1048,7 @@ def optionsControl():
     
      
     
-def extrasControl():
+def extrasControl(event):
     if event.key == pygame.K_RIGHT:
         data.sketchbookSelect = (data.sketchbookSelect + 1) % len(data.sketchbookDisplay)
     if event.key == pygame.K_LEFT:
@@ -1055,14 +1057,14 @@ def extrasControl():
 
 
 def save():
-    try: 
+    try:
         pickle.dump({
            'agility' : data.agilityLevel,
            'fortitude' : data.fortitudeLevel,
            'iterance' : data.iteranceLevel,
            'serendipity' : data.serendipityLevel,
            'resistance' : data.resistanceLevel,
-           'bank' : data.bank ,
+           'bank' : data.bank,
            'unlockedCannons' : data.unlockedCannons,
            'maxHeight' : 0,
            'playTime' : 0,
@@ -1071,19 +1073,19 @@ def save():
            'unlockedBoots' : data.unlockedBoots,
            'currentBoot' : data.currentBoot,
            'autoSave' : data.autoSave
-           
-            },open('PaperLaunchFiles/PLSaveFile.pkl','wb'))
+            }, open(SAVE_FILE, 'wb'))
         data.onScreenIcons[0].killTime = 40
-        data.onScreenIcons[2].killTime = 40 
-    except: print 'fuck'
+        data.onScreenIcons[2].killTime = 40
+    except (IOError, OSError) as e:
+        print(f'save failed: {e}')
     
-def moveBootButton():
+def moveBootButton(event):
     if event.key == pygame.K_RIGHT:
         data.bootButtonSelect = (data.bootButtonSelect + 1) % (data.unlockedBoots + 1) % 3
     if event.key == pygame.K_LEFT:
         data.bootButtonSelect = (data.bootButtonSelect - 1) % (data.unlockedBoots + 1) % 3
     
-def storeControl():
+def storeControl(event):
     # controls The store. It  workts by using the index of a stat
     # and the using the mod fuction to loop around the stat is a circle like
     # patter and whatnot
@@ -1095,11 +1097,11 @@ def storeControl():
     elif event.key == pygame.K_DOWN:
         data.storeButtonSelect = (data.storeButtonSelect + 1)%7
     if data.storeButtonSelect == 5:
-        moveBootButton()
+        moveBootButton(event)
     if data.storeButtonSelect == 6:
         if event.key == pygame.K_RIGHT:
             data.cannonButtonSelect = (data.cannonButtonSelect +1 )% (data.unlockedCannons + 1) % 5
-        if event.key == pygame.K_LEFT:   
+        if event.key == pygame.K_LEFT:
             data.cannonButtonSelect = (data.cannonButtonSelect -1 )% (data.unlockedCannons + 1) % 5
     if event.key == pygame.K_RETURN:
         if data.storeButtonSelect == 5 and data.bootButtonSelect < data.unlockedBoots:
@@ -1150,7 +1152,7 @@ def buyShit():
     if data.autoSave:
         save()
 
-def gameControl():
+def gameControl(event):
     if data.launch == 'launchBar':
         data.launch = 'angle'
     elif data.launch == 'angle':
@@ -1182,14 +1184,14 @@ def gameControl():
     if event.key == pygame.K_d:
         data.debugMode = not(data.debugMode)
     if data.gameOver == True:
-        gameOverControl()
+        gameOverControl(event)
 
 def boost():
     data.xSpeed = abs(data.xSpeed) + data.bootForce[data.currentBoot]
     data.yVelocity = abs(data.yVelocity)/2 + data.bootForce[data.currentBoot]
     data.boostCount -= 1
 
-def gameOverControl():
+def gameOverControl(event):
     if event.key == pygame.K_DOWN or event.key == pygame.K_UP:
         data.gameOverButtonSelect = not( data.gameOverButtonSelect)
     if event.key == pygame.K_RETURN:
@@ -1198,7 +1200,7 @@ def gameOverControl():
         else:
             initGame()
 
-def mainMenuControl():
+def mainMenuControl(event):
     if event.key == pygame.K_LEFT:
         data.buttonSelect = (data.buttonSelect - 1)%4
     if event.key == pygame.K_RIGHT:
@@ -1217,8 +1219,8 @@ def mainMenuControl():
 
 
 def goBack():
-    if data.currentScreen == 'game' or data.currentScreen == 'store' or 'extras':
-        data.currentScreen = 'mainMenu'  
+    if data.currentScreen in ('game', 'store', 'extras'):
+        data.currentScreen = 'mainMenu'
 
 ##########################################################################
 ################### Main Loop ############################################
@@ -1228,17 +1230,19 @@ init()
 
 # -------- Main Program Loop -----------
 done = False
-while done==False:
-    for event in pygame.event.get(): # User did something
-        if event.type == pygame.QUIT: # If user clicked close
-           done=True # Flag that we are done so we exit this loop
-    # Set the screen background
+while not done:
+    events = pygame.event.get()
+    for event in events:
+        if event.type == pygame.QUIT:
+            done = True
     data.screen.fill(black)
     if data.currentScreen == 'game':
         gamePlay()
     for icon in data.onScreenIcons:
         icon.animate()
-    keyPressed()
+    for event in events:
+        if event.type != pygame.QUIT:
+            keyPressed(event)
     redrawAll()
     clock.tick(30)
     # Go ahead and update the screen with what we've drawn.
