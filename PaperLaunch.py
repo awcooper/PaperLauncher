@@ -5,9 +5,12 @@
 ##Paper Launch!!!!                       ## 
 ##A 15-112 term project by Adam Cooper   ##
 ###########################################
-import pygame, os, pickle, random, math, time
+import pygame, os, pickle, random, math, time, copy
 
-SAVE_FILE = 'PaperLaunchFiles/PLSaveFile.pkl'
+# Resolve paths relative to this file so the game runs from any directory.
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+IMAGE_DIR = os.path.join(BASE_DIR, 'PaperLaunchFiles', 'Images')
+SAVE_FILE = os.path.join(BASE_DIR, 'PaperLaunchFiles', 'PLSaveFile.pkl')
 pygame.init()
 pygame.font.init()
 
@@ -40,25 +43,32 @@ def empty():
                'unlockedCannons': 1,
                'currentCannon' : 'slingshot',
                'sketchbook' : ['self'],
-                'unlockedBoots' : 1,
                 'currentBoot' : 'oldBoots',
-                'autoSave' : True 
+                'autoSave' : True
                 }
+
+def freshSave():
+    # Always hand out a deep copy so gameplay never mutates the template
+    # (previously the sketchbook list was shared, so "Delete File" kept it).
+    return copy.deepcopy(data.emptySaveFile)
 
 def loadGame():
     try:
-        data.save = pickle.load(open(SAVE_FILE, 'rb'))
+        with open(SAVE_FILE, 'rb') as f:
+            loaded = pickle.load(f, encoding='latin1')
+        # Fill in any keys missing from older save files.
+        data.save = freshSave()
+        data.save.update(loaded)
         data.firstTime = False
-    except (FileNotFoundError, IOError, EOFError, pickle.UnpicklingError):
-        saveFile = data.emptySaveFile
+    except (IOError, OSError, EOFError, pickle.UnpicklingError):
         data.firstTime = 'saveMessage'
+        data.save = freshSave()
         try:
-            pickle.dump(saveFile, open(SAVE_FILE, 'wb'))
-            data.save = pickle.load(open(SAVE_FILE, 'rb'))
+            with open(SAVE_FILE, 'wb') as f:
+                pickle.dump(data.save, f)
             data.createdSaveFile = True
         except (IOError, OSError):
             data.createdSaveFile = False
-            data.save = data.emptySaveFile
 
 empty()
 loadGame()
@@ -80,7 +90,7 @@ def init(constant = False):
     initExtras()
 
 def initExtras():
-    data.sketchbook = data.save['sketchbook']
+    data.sketchbook = list(data.save['sketchbook'])
     data.sketchbookSelect = 0
     data.sketchbookDisplay =['self']
     
@@ -127,11 +137,11 @@ def makeSketchbook():
     if 'slingshot' in data.sketchbook:
         display += [(sprite, 'Adam Cooper') for sprite in [data.sprites['slingshot'],
                                                 data.sprites['slingshotSwoosh']]]
-    if data.unlockedBoots == 3:
-        display += [(data.sprites['hermesBoot'],'Faith Quist')]
-    if data.unlockedBoots != 1:
+    if data.unlockedBoots >= 2:
         display += [(data.sprites['moonBoot'],'Adam Cooper')]
-    return display 
+    if data.unlockedBoots >= 3:
+        display += [(data.sprites['hermesBoot'],'Faith Quist')]
+    return display
         
     
 def initGame():
@@ -192,15 +202,17 @@ def initItemInfo():
     data.fortitudePower = { 0:(1.7, -1.85), 1:(1.5, -1.7), 2:(1.4, -1.6),3:(1.3, -1.5), 4:( 1.15, -1.4), 5:(1.1, -1.2) }
     data.serendipityPower = {0:0, 1:0, 2:0, 3:0, 4:0, 5:0 }
     data.speedCap = {0:0,1:0,2:0,3:0,4:0,5:0}
-    data.bootForce = {'oldBoots':8, 'hermesBoots':15,'moonBoots':28}
-    data.allBoots = ['oldBoots','hermesBoots','moonBoots']
+    # Order matches the store icons and descriptions: Old -> Moon -> Hermes.
+    # (Previously the names were swapped relative to the store text.)
+    data.bootForce = {'oldBoots':8, 'moonBoots':15, 'hermesBoots':28}
+    data.allBoots = ['oldBoots','moonBoots','hermesBoots']
     makeStoreButton()
 
 def initImages():
     # this sets up some general image information that is useful during gameplay 
     data.htpImages = []
     data.sprites = dict()
-    imageFinder('PaperLaunchFiles/Images')
+    imageFinder(IMAGE_DIR)
     for htpnumber in range(1,9):
         data.htpImages += [data.sprites['htp' + str(htpnumber)]]
     data.selfFallingSprite = [data.sprites['selfFalling'],
@@ -237,11 +249,14 @@ def imageFinder(path):
     # compiles a dictinary of all of the image files in the folder and uses
     # the name of the file as a key. This is useful for organizatonal purpouses 
     for filename in os.listdir(path):
-        if os.path.isdir(path + "/" + filename) == False:
-            try: data.sprites[filename[0:len(filename)-4]] = pygame.image.load(path + "/" + filename)
-            except: pass
+        full = os.path.join(path, filename)
+        if os.path.isdir(full):
+            imageFinder(full)
         else:
-            imageFinder(path + "/" + filename)
+            name, ext = os.path.splitext(filename)
+            if ext.lower() in ('.png', '.jpg', '.jpeg', '.gif', '.bmp'):
+                try: data.sprites[name] = pygame.image.load(full)
+                except pygame.error: pass
 
 
 def initPhysics():
@@ -277,7 +292,14 @@ def initStats():
     data.unlockedBoots = data.save['unlockedBoots']
     data.currentBoot = data.save['currentBoot']
     data.autoSave = data.save['autoSave']
-    
+    data.bestHeight = data.save.get('maxHeight', 0)
+    if data.currentBoot not in ('oldBoots', 'moonBoots', 'hermesBoots'):
+        data.currentBoot = 'oldBoots'
+
+def syncStats():
+    data.stats = [data.agilityLevel, data.fortitudeLevel, data.iteranceLevel,
+                  data.serendipityLevel, data.resistanceLevel]
+
 def initSound():
     #This Peice of Code has Been Removed Initially the game was Supposed to
     #Make these songs Available But I changed my mind last minute, In a futrue
@@ -330,10 +352,13 @@ def monsterFactory():
             data.onScreen += [money()]
 
 def gameOver():
+    # Award distance money BEFORE saving (previously it was added after the
+    # save, so it was lost if you quit from the game-over screen).
+    data.bank += data.distance//100
+    data.bestHeight = max(data.bestHeight, data.maxHeight)
+    data.endTime = time.time()
     if data.autoSave:
         save()
-    data.bank += data.distance//100
-    data.endTime = time.time()
     
 
 ##########################################################################
@@ -354,7 +379,8 @@ def movement():
     data.bgx += data.xSpeed/3
     data.distance += data.xSpeed
     gravity()
-    for item in data.onScreen:
+    # Iterate over a copy: objects can remove themselves while moving.
+    for item in list(data.onScreen):
         item.moveObject()
     # this mess of a conditional adjusts the Camera to follow the Ball
     moveCamera()
@@ -368,13 +394,18 @@ def moveCamera():
     # background insead of the character. Othewse it is added to the height
     # of the actual character. The same logic is meshed with this function
     # for the moving down animation
-    if data.selfHeight < data.canvasHeight/2 or \
-        (data.yVelocity < 0  and data.bgy == 0) or \
-        ( data.yVelocity > 0 and  data.bgy == data.bgHeight - data.canvasHeight) or\
-        (data.selfHeight + data.ground > data.canvasHeight*.8): 
-            data.selfHeight += data.yVelocity 
-    else:
+    if cameraAbsorbsVelocity():
         data.bgy += data.yVelocity
+    else:
+        data.selfHeight += data.yVelocity
+
+def cameraAbsorbsVelocity():
+    # True when the background (camera) scrolls instead of the player moving.
+    # Shared by the player and every on-screen object so they stay in sync.
+    return not (data.selfHeight < data.canvasHeight/2 or
+                (data.yVelocity < 0 and data.bgy == 0) or
+                (data.yVelocity > 0 and data.bgy == data.bgHeight - data.canvasHeight) or
+                (data.selfHeight + data.ground > data.canvasHeight*.8))
 
 def bounce():
     data.selfHeight = 0
@@ -385,6 +416,14 @@ def bounce():
         data.yVelocity = 0
     data.xSpeed = int(data.xSpeed/data.xFriction)
 
+
+def randY(low, high):
+    # Spawn height helper. Positions can be floats in Python 3 (true division),
+    # which random.randint rejects on Python 3.12+, so coerce and order them.
+    low, high = int(low), int(high)
+    if high < low:
+        low, high = high, low
+    return random.randint(low, high)
 
 def gravity():
     data.yVelocity -= 1
@@ -401,23 +440,37 @@ class physicalObject(object):
     # interactable object in the game. Basically the objects move along with the
     # background this fuction also checks for collison with self.hitbox
     # and changes the hitbox as the object Moves
+    def updateHitbox(self, pad = .2):
+        self.hitbox = pygame.Rect(int(self.location[0] + self.width*pad),
+                                  int(self.location[1] + self.height*pad),
+                                  int(self.width *( 1 - pad*2)),
+                                  int(self.height *( 1 - pad*2)))
+    def remove(self):
+        if self in data.onScreen:
+            data.onScreen.remove(self)
     def moveObject(self):
         if self.location[0] < -data.canvasWidth/2 or self.location[0] > data.canvasWidth*1.5:
-            data.onScreen.remove(self)
+            # Previously the object kept moving (and could collide) after
+            # removal, which crashed when money was removed twice.
+            self.remove()
+            return
         self.location[0] -= data.xSpeed/3 + self.resistance
-        if not(data.selfHeight < data.canvasHeight/2 or (data.yVelocity < 0\
-                                                         and data.bgy == 0)\
-               or ( data.yVelocity > 0 and  data.bgy == data.bgHeight - data.canvasHeight)\
-               or (data.selfHeight + data.ground > data.canvasHeight*.8)):
+        if cameraAbsorbsVelocity():
             self.location[1] += data.yVelocity
+        self.updateHitbox()
         if self.hitbox.colliderect(data.selfHitbox):
             self.event()
+    def discover(self, name = None):
+        name = name or str(type(self).__name__)
+        if name not in data.sketchbook:
+            data.sketchbook.append(name)
+            data.onScreenIcons[1].killTime = 40
     def draw(self):
     # 33.33% of objects in the game actually use this function. This function is
     # really for objects that are not animated. The fucntion uses the same method
     # in order to draw the hitboxes as all of the classes will do
         pad = .2
-        self.hitbox = pygame.Rect(int(self.location[0] + self.width*pad),int(self.location[1] + self.height*pad), int(self.width *( 1 - pad*2)),int(self.height *( 1 - pad*2))) 
+        self.updateHitbox(pad)
         data.screen.blit(self.image,self.location)
         if data.debugMode == True:
             pygame.draw.rect(data.screen,data.red, self.hitbox ,4 )
@@ -426,9 +479,7 @@ class physicalObject(object):
         # the default if I havent programed one in yet
         # all objects have this as its adds its name into the sketchbook
         # if its name isn't already there
-        if not (str(type(self).__name__) in data.sketchbook):
-            data.sketchbook += [str(type(self).__name__)]
-            data.onScreenIcons[1].killTime = 40
+        self.discover()
     def __str__(self):
         # This serves a purpuse for Debug Mode
         return str(type(self).__name__)
@@ -446,13 +497,11 @@ class cannon(physicalObject):
     def event(self):
         if data.currentCannon == 'slingshot':
             self.image = data.sprites['slingshotSwoosh']
-        if not (data.currentCannon in data.sketchbook):
-            data.sketchbook += [data.currentCannon]
-            data.onScreenIcons[1].killTime = 40
+        self.discover(data.currentCannon)
 
 
 #data.canvasHeight - data.ground - self.height + data.bgy - 2 this is the ground 
-#random.randint( data.canvasHeight - data.bgHeight + self.height + data.bgy,
+#randY( data.canvasHeight - data.bgHeight + self.height + data.bgy,
 #  data.canvasHeight - data.ground - self.height + data.bgy - 2) 
  
 class bear(physicalObject): 
@@ -469,9 +518,7 @@ class bear(physicalObject):
             data.xSpeed = int(data.xSpeed*(.78 + data.resistanceLevel*.03))
             data.yVelocity = -int((abs(data.yVelocity)) - 15)
             # hits you into the ground and slows you down
-        if not (str(type(self).__name__) in data.sketchbook):
-            data.sketchbook += [str(type(self).__name__)]
-            data.onScreenIcons[1].killTime = 40
+        self.discover()
         
 
 class shark(physicalObject):
@@ -481,7 +528,7 @@ class shark(physicalObject):
         self.encounter = False
         self.image = data.sprites['shark']
         self.width, self.height = self.image.get_size()
-        self.location = [ (data.canvasWidth + self.width ), random.randint(
+        self.location = [ (data.canvasWidth + self.width ), randY(
             data.canvasHeight - data.bgHeight + self.height + data.bgy,
             data.canvasHeight - data.bgHeight//2 + self.height + data.bgy ) ]
     def event(self):
@@ -490,9 +537,7 @@ class shark(physicalObject):
             data.xSpeed = int(data.xSpeed*(.4 + data.resistanceLevel*.1))
             data.yVelocity = -int((abs(data.yVelocity))) - 12
             # hits you down fast and slows you down 
-        if not (str(type(self).__name__) in data.sketchbook):
-            data.sketchbook += [str(type(self).__name__)]
-            data.onScreenIcons[1].killTime = 40
+        self.discover()
 
 class car(physicalObject):
     def __init__(self):
@@ -509,10 +554,7 @@ class car(physicalObject):
         # its own animation counter and uses it to animate iteself by moding
         # itself with different numbers 
         self.animationCounter = (self.animationCounter + 1)%10
-        self.hitbox = pygame.Rect(int(self.location[0] + self.width*pad),
-                                  int(self.location[1] + self.height*pad),
-                                  int(self.width *( 1 - pad*2)),
-                                  int(self.height *( 1 - pad*2))) 
+        self.updateHitbox(pad)
         if self.animationCounter%9 < 5:
             self.image = data.sprites['car1']
         else: self.image = data.sprites['car12']
@@ -525,9 +567,7 @@ class car(physicalObject):
             data.yVelocity = (10 + abs(data.yVelocity))
             self.encounter = True
             # hits you up but slows you down 
-        if not (str(type(self).__name__) in data.sketchbook):
-            data.sketchbook += [str(type(self).__name__)]
-            data.onScreenIcons[1].killTime = 40
+        self.discover()
 
 
 class nyanCat(physicalObject):
@@ -538,21 +578,18 @@ class nyanCat(physicalObject):
         self.image = data.sprites['nyanCat']
         self.width, self.height = self.image.get_size()
         self.location = [ (data.canvasWidth + self.width ),
-            random.randint( data.canvasHeight - data.bgHeight + self.height + data.bgy,
+            randY( data.canvasHeight - data.bgHeight + self.height + data.bgy,
                            data.canvasHeight - data.bgHeight//2 + self.height + data.bgy ) ]
     def draw(self):
         pad = .2
         # for more explanations look at car
         self.animationCounter = (self.animationCounter + 1 )% 12
-        self.hitbox = pygame.Rect(int(self.location[0] + self.width*pad),
-                                  int(self.location[1] + self.height*pad),
-                                  int(self.width *( 1 - pad*2)),
-                                  int(self.height *( 1 - pad*2))) 
+        self.updateHitbox(pad)
         if (self.animationCounter//3) % 4 == 0:
             self.image = data.sprites['nyanCat']
-        if (self.animationCounter//3) % 4 == 1:
+        elif (self.animationCounter//3) % 4 == 1:
             self.image = data.sprites['nyanCat1']
-        if (self.animationCounter//3) % 4 == 2:
+        elif (self.animationCounter//3) % 4 == 2:
             self.image = data.sprites['nyanCat2']
         else: self.image = data.sprites['nyanCat3']
         data.screen.blit(self.image,self.location)
@@ -562,9 +599,7 @@ class nyanCat(physicalObject):
         if data.boostCount < data.maxBoost and self.encounter == False:
             data.boostCount += 1
             self.encounter = True
-        if not (str(type(self).__name__) in data.sketchbook):
-            data.sketchbook += [str(type(self).__name__)]
-            data.onScreenIcons[1].killTime = 40
+        self.discover()
 
 
 class money(physicalObject):
@@ -573,16 +608,14 @@ class money(physicalObject):
         self.image = data.sprites['money']
         self.width, self.height = self.image.get_size()
         self.location = [ (data.canvasWidth + self.width ),
-            random.randint( data.canvasHeight - data.bgHeight + self.height + data.bgy,
+            randY( data.canvasHeight - data.bgHeight + self.height + data.bgy,
                            data.canvasHeight - data.ground - self.height + data.bgy - 2) ]
     def event(self):
-        data.onScreen.remove(self)
+        self.remove()
         value = 100
         data.runCash += value
         data.bank += value
-        if not (str(type(self).__name__) in data.sketchbook):
-            data.sketchbook += [str(type(self).__name__)]
-            data.onScreenIcons[1].killTime = 40
+        self.discover()
 
 class airplane(physicalObject):
     def __init__(self):
@@ -592,15 +625,13 @@ class airplane(physicalObject):
         self.image = data.sprites['airplane']
         self.width, self.height = self.image.get_size()
         self.location = [ (data.canvasWidth + self.width ),
-            random.randint( data.canvasHeight - data.bgHeight + self.height + data.bgy,
+            randY( data.canvasHeight - data.bgHeight + self.height + data.bgy,
                            data.canvasHeight - data.bgHeight//2 + self.height + data.bgy ) ]
     def draw(self):
         # look at car for more Explanation
         pad = .2
         self.animationCounter = not(self.animationCounter)
-        self.hitbox = pygame.Rect(int(self.location[0] + self.width*pad),
-                                  int(self.location[1] + self.height*pad),
-                                  int(self.width *( 1 - pad*2)),int(self.height *( 1 - pad*2))) 
+        self.updateHitbox(pad)
         data.screen.blit(self.image,self.location)
         if self.encounter == False:
             if self.animationCounter == True:
@@ -615,9 +646,7 @@ class airplane(physicalObject):
             data.yVelocity = abs(data.yVelocity) + 20
             data.xSpeed += 70
             #Hits you up and makes you go faster 
-        if not (str(type(self).__name__) in data.sketchbook):
-            data.sketchbook += [str(type(self).__name__)]
-            data.onScreenIcons[1].killTime = 40
+        self.discover()
 
 class trogdor(physicalObject):
     def __init__(self):
@@ -635,9 +664,7 @@ class trogdor(physicalObject):
             data.yVelocity = abs(data.yVelocity) + 17
             data.xSpeed += 50
             # same deal as the plane but less
-        if not (str(type(self).__name__) in data.sketchbook):
-            data.sketchbook += [str(type(self).__name__)]
-            data.onScreenIcons[1].killTime = 40
+        self.discover()
   
 class icon(object):
     # This is just convient for displaying icons to have each icon have its
@@ -791,7 +818,7 @@ def drawMainMenu():
         image = data.buttonList[(button + data.buttonSelect)%4]
         if button == 1:
             image = pygame.transform.scale(image, (int(data.buttonWidth*scale),
-                    int(data.buttonHeight*scale) +down))
+                    int(data.buttonHeight*scale)))
             position = (data.canvasWidth//2 - int(data.buttonWidth*scale)//2 ,
                     data.canvasHeight//2 - int(data.buttonHeight*scale) +down)
         else: position = (middle - data.buttonWidth - buffer,
@@ -989,8 +1016,6 @@ def scrollBackground():
 ##########################################################################
 
 def keyPressed(event):
-    if event.type == pygame.MOUSEBUTTONDOWN:
-        print(pygame.mouse.get_pos())
     if event.type == pygame.KEYDOWN and data.keyDown == False:
         if data.firstTime == 'saveMessage':
             data.firstTime = True
@@ -1027,9 +1052,12 @@ def optionsControl(event):
             save()
         elif data.optionsSelect == 'erase':
             if data.areYouSure == True:
-                data.save = data.emptySaveFile
+                data.save = freshSave()
                 data.firstTime = True
                 initStats()
+                initExtras()
+                data.sketchbookSelect = 0
+                save()  # actually wipe the file on disk, not just memory
                 data.currentScreen = 'mainMenu'
                 data.areYouSure = False
             else: data.areYouSure = True
@@ -1049,6 +1077,7 @@ def optionsControl(event):
      
     
 def extrasControl(event):
+    data.sketchbookDisplay = makeSketchbook()
     if event.key == pygame.K_RIGHT:
         data.sketchbookSelect = (data.sketchbookSelect + 1) % len(data.sketchbookDisplay)
     if event.key == pygame.K_LEFT:
@@ -1066,14 +1095,14 @@ def save():
            'resistance' : data.resistanceLevel,
            'bank' : data.bank,
            'unlockedCannons' : data.unlockedCannons,
-           'maxHeight' : 0,
+           'maxHeight' : data.bestHeight,
            'playTime' : 0,
            'currentCannon' : data.currentCannon,
-           'sketchbook': data.sketchbook,
+           'sketchbook': list(data.sketchbook),
            'unlockedBoots' : data.unlockedBoots,
            'currentBoot' : data.currentBoot,
            'autoSave' : data.autoSave
-            }, open(SAVE_FILE, 'wb'))
+            }, open(SAVE_FILE, 'wb'))  # noqa: SIM115
         data.onScreenIcons[0].killTime = 40
         data.onScreenIcons[2].killTime = 40
     except (IOError, OSError) as e:
@@ -1123,17 +1152,12 @@ def storeControl(event):
         elif data.storeButtonSelect < 5 and data.stats[data.storeButtonSelect] < 5 and \
             data.bank >= data.costs[data.storeButtonSelect][data.stats[data.storeButtonSelect]]:
             data.bank -= data.costs[data.storeButtonSelect][data.stats[data.storeButtonSelect]]
-            buyShit()
+            buyUpgrade()
  
 def setBoot():
-    if  data.bootButtonSelect == 0:
-        data.currentBoot = 'oldBoots'
-    elif  data.bootButtonSelect == 1:
-        data.currentBoot = 'hermesBoots'
-    elif  data.bootButtonSelect == 2:
-        data.currentBoot = 'moonBoots'
+    data.currentBoot = data.allBoots[data.bootButtonSelect]
     
-def buyShit():
+def buyUpgrade():
     if data.storeButtonSelect == 0:
                 data.agilityLevel += 1
     elif data.storeButtonSelect == 1:
@@ -1144,11 +1168,7 @@ def buyShit():
         data.serendipityLevel += 1
     elif data.storeButtonSelect == 4:
         data.resistanceLevel += 1
-    data.stats = [data.agilityLevel,
-                  data.fortitudeLevel,
-                  data.iteranceLevel,
-                  data.serendipityLevel,
-                  data.resistanceLevel]
+    syncStats()
     if data.autoSave:
         save()
 
@@ -1161,6 +1181,8 @@ def gameControl(event):
         data.yVelocity = int( math.sin(data.theta) * (data.launchBarLength/100.0) * power) + 20
         data.launch = False
         data.startTime = time.time()
+    elif data.gameOver:
+        pass
     elif data.boostCount > 0 and event.key == pygame.K_SPACE:
         boost()
     elif data.debugMode == True:
@@ -1188,7 +1210,7 @@ def gameControl(event):
 
 def boost():
     data.xSpeed = abs(data.xSpeed) + data.bootForce[data.currentBoot]
-    data.yVelocity = abs(data.yVelocity)/2 + data.bootForce[data.currentBoot]
+    data.yVelocity = abs(data.yVelocity)//2 + data.bootForce[data.currentBoot]
     data.boostCount -= 1
 
 def gameOverControl(event):
@@ -1219,45 +1241,38 @@ def mainMenuControl(event):
 
 
 def goBack():
-    if data.currentScreen in ('game', 'store', 'extras'):
+    # Options was missing here, so Esc could never leave the options screen.
+    if data.currentScreen in ('game', 'store', 'extras', 'options'):
+        data.areYouSure = False
         data.currentScreen = 'mainMenu'
 
 ##########################################################################
 ################### Main Loop ############################################
 ##########################################################################
-clock=pygame.time.Clock()
-init()
+def main():
+    clock = pygame.time.Clock()
+    init()
+    done = False
+    while not done:
+        events = pygame.event.get()
+        for event in events:
+            if event.type == pygame.QUIT:
+                done = True
+        data.screen.fill(black)
+        if data.currentScreen == 'game':
+            gamePlay()
+        for icon in data.onScreenIcons:
+            icon.animate()
+        for event in events:
+            if event.type != pygame.QUIT:
+                keyPressed(event)
+        redrawAll()
+        clock.tick(30)
+        pygame.display.flip()
+    if data.autoSave:
+        save()
+    pygame.quit()
 
-# -------- Main Program Loop -----------
-done = False
-while not done:
-    events = pygame.event.get()
-    for event in events:
-        if event.type == pygame.QUIT:
-            done = True
-    data.screen.fill(black)
-    if data.currentScreen == 'game':
-        gamePlay()
-    for icon in data.onScreenIcons:
-        icon.animate()
-    for event in events:
-        if event.type != pygame.QUIT:
-            keyPressed(event)
-    redrawAll()
-    clock.tick(30)
-    # Go ahead and update the screen with what we've drawn.
-    pygame.display.flip()
 
-
-
-##########################################################################
-################### Helper Functions #####################################
-##########################################################################
-
-def filePath( items, extention, folder = '',):
-    # I dont really Use this anymore
-    if len(folder) > 0:
-        folder += '/'
-    return ["C:/python27/launch/" + folder + item  + extention for item in items ]
-
-pygame.quit () 
+if __name__ == '__main__':
+    main()
