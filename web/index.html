@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#f4ecc8">
+  <meta name="description" content="Paper Launch — a doodle-themed launching game. Originally a 2012 CMU 15-112 term project by Adam W. Cooper.">
+  <title>Paper Launch</title>
+  <link rel="icon" href="assets/selfair.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="stage">
+    <canvas id="game" width="1000" height="600" aria-label="Paper Launch game" tabindex="0"></canvas>
+    <div id="loading">Sharpening pencils…</div>
+    <nav id="touchbar" aria-label="Game controls">
+      <button id="btn-back" type="button" title="Back (Esc)">&larr; Back</button>
+      <button id="btn-help" type="button" title="How to play (I)">?</button>
+      <button id="btn-full" type="button" title="Fullscreen">&#x26F6;</button>
+    </nav>
+  </main>
+  <p id="hint">
+    <span class="keys">Arrow keys + Enter to navigate &middot; Space to launch &amp; boost &middot; Esc to go back &middot; I for help</span>
+    <span class="touch">Tap to launch &amp; boost &middot; tap an item twice to buy &middot; turn your phone sideways for a bigger view</span>
+  </p>
+  <script src="js/game.js"></script>
+</body>
+</html>
